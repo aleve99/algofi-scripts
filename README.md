@@ -1,5 +1,5 @@
-# algofi-liquidation-report
-Scripts to report account health ratios and liquidation events on the Algofi lending protocol.
+# algofi-scripts
+Useful scripts for the Algofi Protocol.
 
 ## Status
 This repo is undergoing continuous development.
