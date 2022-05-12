@@ -5,29 +5,20 @@ import pandas as pd
 
 from utils import *
 from algofi.v1.client import AlgofiMainnetClient
-
-sys.path.insert(0, "../../algofi-blockchain-utils")
-from network_config import network_config
-from offchain_utils import *
-from onchain_utils import *
     
 # save html report to location
-def save_report(html_path, html_report):
+def save_report(html_fpath, html_report):
     # save html report
-    with open(html_path+"liq.html", "w") as html_file:
+    with open(html_fpath+"liq.html", "w") as html_file:
         html_file.write(html_report)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Input processor")
     parser.add_argument("--block_delta", type=int, default=20000)
-    parser.add_argument("--network", type=str, required=True)
-    parser.add_argument("--indexer_network", type=str, required=True)
-    parser.add_argument("--html_path", type=str, required=True)
+    parser.add_argument("--html_fpath", type=str, required=True)
     args = parser.parse_args()
     
-    client = algod_client(network_config, args.network)
-    indexer_client = indexer_client(network_config, args.indexer_network)
-    algofi_client = AlgofiMainnetClient(client)
+    algofi_client = AlgofiMainnetClient()
 
     current_round = algofi_client.indexer.health()["round"]
     start_round = current_round - args.block_delta
@@ -122,5 +113,5 @@ if __name__ == '__main__':
     borrow_report = df.groupby("Borrow Market").sum()[["Repay Amount"]].to_html()
     collateral_report = df.groupby("Collateral Market").sum()[["Collateral Seized"]].to_html()
     report = df.to_html()
-    if args.html_path:
-        save_report(args.html_path, borrow_report + "<br>" + collateral_report + "<br>" + report)
+    if args.html_fpath:
+        save_report(args.html_fpath, borrow_report + "<br>" + collateral_report + "<br>" + report)

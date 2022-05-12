@@ -22,7 +22,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from dotenv import load_dotenv, dotenv_values
 
-from algofi.v1.client import AlgofiTestnetClient, AlgofiMainnetClient
+from algofi.v1.client import AlgofiMainnetClient
 from algofi.contract_strings import algofi_manager_strings as manager_strings
 from algofi.contract_strings import algofi_market_strings as market_strings
 
