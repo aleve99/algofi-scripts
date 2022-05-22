@@ -63,27 +63,6 @@ def get_user_health_ratios_from_state(algofi_client):
         user_health_ratio_data[storage_account] = process_storage_account_data(algofi_client, storage_account_data, decimal_scale_factors, market_app_ids, prices, exch_rates, underlying_borrowed_data, outstanding_borrow_shares_data, collateral_factors)
     return user_health_ratio_data
 
-def get_user_data_one_off(algofi_client, storage_account):
-    # load market specific data
-    markets = [algofi_client.markets[x] for x in algofi_client.get_active_markets()]
-    market_app_ids = algofi_client.get_active_market_app_ids()
-    bank_to_underlying_exchange_rates = [market.get_bank_to_underlying_exchange() for market in markets]
-    exch_rates = dict(zip(market_app_ids, scale_values(bank_to_underlying_exchange_rates, 1./algofi_client.SCALE_FACTOR)))
-    underlying_borrowed = [market.get_underlying_borrowed() for market in markets]
-    underlying_borrowed_data = dict(zip(market_app_ids, underlying_borrowed))
-    outstanding_borrow_shares = [market.get_outstanding_borrow_shares() for market in markets]
-    outstanding_borrow_shares_data = dict(zip(market_app_ids, outstanding_borrow_shares))
-    coll_factors = [market.get_collateral_factor() for market in markets]
-    collateral_factors = dict(zip(market_app_ids, scale_values(coll_factors, 1./algofi_client.PARAMETER_SCALE_FACTOR)))
-    decimals = [10**market.asset.get_underlying_decimals() for market in markets]
-    decimal_scale_factors = dict(zip(market_app_ids, decimals))
-    price = [market.asset.get_price() for market in markets]
-    prices = dict(zip(market_app_ids, price))
-    # iterate over storage accounts
-    user_health_ratio_data = {}
-    user_health_ratio_data[storage_account] = get_user_data(algofi_client, storage_account, decimal_scale_factors, market_app_ids, prices, exch_rates, underlying_borrowed_data, outstanding_borrow_shares_data, collateral_factors)
-    return user_health_ratio_data
-
 # save html + csv report to location
 def save_report(html_path, data, html_report):
     # save html report
