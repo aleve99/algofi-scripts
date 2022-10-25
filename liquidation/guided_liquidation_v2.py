@@ -131,7 +131,7 @@ def display_target_data(algofi_client, target_address, liquidatee_user, liquidat
             display_borrow = round(user_market_state.borrowed_underlying.underlying / decimal_scale_factor, 6)
             display_collateral = round(user_market_state.b_asset_collateral_underlying.underlying / decimal_scale_factor, 6)
             if (display_borrow > 0 or display_collateral > 0):
-                state_table.add_row([symbol, display_collateral, display_borrow, display_collateral_usd, display_borrow_usd, "X" if liquidator_balances.get(symbol, 0) else ""])
+                state_table.add_row([symbol, display_collateral, display_borrow, display_collateral_usd, display_borrow_usd, "X" if (liquidator_balances.get(symbol, 0) and display_borrow_usd) else ""])
     print(state_table)
 
 if __name__ == "__main__":

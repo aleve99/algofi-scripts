@@ -65,13 +65,13 @@ def display_balance_data(algofi_client, balances, prices):
             state_table.add_row([symbol, display_balance, display_balance_usd])
     print(state_table)
 
-def display_target_data(algofi_client, target_address, target_state, target_totals):
+def display_target_data(algofi_client, target_address, target_state, target_totals, liquidator_balances):
     print("{} CURRENT STATE".format(target_address))
     print("User Max Borrow (USD): {}, User Total Borrow (USD): {}, Health Ratio: {}".format(round(target_totals["max_borrow_usd"], 2),
                                                                                 round(target_totals["total_borrow_usd"], 2),
                                                                                 round(target_totals["total_borrow_usd"]/target_totals["max_borrow_usd"], 10)))
     state_table = PrettyTable()
-    state_table.field_names = ["SYMBOL", "COLLATERAL", "BORROW", "COLLATERAL_USD", "BORROW_USD"]
+    state_table.field_names = ["SYMBOL", "COLLATERAL", "BORROW", "COLLATERAL_USD", "BORROW_USD", "CAN REPAY"]
     for symbol, market in algofi_client.get_active_markets().items():
         decimal_scale_factor = 10**market.get_asset().get_underlying_decimals()
         display_borrow_usd = round(target_state[symbol]["borrow_usd"], 2)
@@ -79,7 +79,7 @@ def display_target_data(algofi_client, target_address, target_state, target_tota
         display_borrow = round(target_state[symbol]["borrow_underlying"] / decimal_scale_factor, 6)
         display_collateral = round(target_state[symbol]["active_collateral_underlying"] / decimal_scale_factor, 6)
         if (display_borrow > 0 or display_collateral > 0):
-            state_table.add_row([symbol, display_collateral, display_borrow, display_collateral_usd, display_borrow_usd])
+            state_table.add_row([symbol, display_collateral, display_borrow, display_collateral_usd, display_borrow_usd, "X" if (liquidator_balances.get(symbol, 0) and display_borrow_usd) else ""])
     print(state_table)
 
 # state loaders
@@ -175,7 +175,6 @@ if __name__ == "__main__":
     liquidator_address = account.address_from_private_key(liquidator_key)
     
     # initialize clients
-    print("loading clients...")
     algod_client = AlgodClient(args.algod_token, args.algod_uri)
     indexer_client = IndexerClient(args.indexer_token, args.indexer_uri)
     algofi_client = AlgofiMainnetClient(algod_client, indexer_client)
@@ -190,19 +189,25 @@ if __name__ == "__main__":
             target_address = input("Enter liquidatee target address: ")
 
         print("loading target state...")
-        target_state = algofi_client.get_storage_state(target_address)
-        target_totals = get_borrow_totals(algofi_client, target_state)
+        try:
+            target_state = algofi_client.get_storage_state(target_address)
+            target_totals = get_borrow_totals(algofi_client, target_state)
+        except:
+            print("Failed to load user with storage account address " + target_address)
+            continue
+
         print("loading prices...")
         prices = algofi_client.get_prices()
         print("loading balances...")
         liquidator_balances = load_borrowable_balances(algofi_client, liquidator_address)
         
         display_balance_data(algofi_client, liquidator_balances, prices)
-        display_target_data(algofi_client, target_address, target_state, target_totals)
+        display_target_data(algofi_client, target_address, target_state, target_totals, liquidator_balances)
         
         if not get_user_confirmation("Begin liquidation?"):
             continue
-        repayable_symbols = [sym for sym in algofi_client.get_active_ordered_symbols() if target_state[sym]["borrow_usd"] > 0]
+
+        repayable_symbols = [sym for sym in algofi_client.get_active_ordered_symbols() if (target_state[sym]["borrow_usd"] > 0 and liquidator_balances.get(sym, 0))]
         repay_symbol = get_user_selection("Enter repay symbol:", {i+1 : repayable_symbols[i] for i in range(len(repayable_symbols))})
         collateral_symbols = [sym for sym in algofi_client.get_active_ordered_symbols() if target_state[sym]["active_collateral_usd"] > 0]
         collateral_symbol = get_user_selection("Enter seize symbol:", {i+1 : collateral_symbols[i] for i in range(len(collateral_symbols))})
@@ -212,4 +217,7 @@ if __name__ == "__main__":
         repay_amount_base = get_user_numeric_value("Enter amount to liquidate.", 0, max_liquidation_base, max_liquidation_base * DEFAULT_TAKE_PERCENTAGE)
         repay_amount = int(repay_amount_base * 10**algofi_client.get_market(repay_symbol).get_asset().get_underlying_decimals())
 
-        execute_liquidation(algofi_client, repay_symbol, collateral_symbol, repay_amount, liquidator_address, liquidator_key, target_address)
+        try:
+            execute_liquidation(algofi_client, repay_symbol, collateral_symbol, repay_amount, liquidator_address, liquidator_key, target_address)
+        except:
+            print("Failed to liquidate " + target_address + " by repaying " + repay_symbol + " and seizing " + collateral_symbol)
