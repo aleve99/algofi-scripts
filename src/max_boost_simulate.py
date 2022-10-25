@@ -49,6 +49,6 @@ if __name__ == "__main__":
                 # projected based on inputs
                 user_vebank = baseline_bank_amount * lock_time_in_months / 12 * 1e6
                 boost_multiplier = user_vebank / total_vebank
-                user_scaled_amount = min(0.4 * user_staked_amount + 0.6 * boost_multiplier * global_total_staked, user_staked_amount)
+                user_scaled_amount = min(0.4 * user_staked_amount + 0.6 * boost_multiplier * (global_total_staked+user_staked_amount), user_staked_amount)
                 boost = user_scaled_amount / (0.4 * user_staked_amount)
                 print("Lock " + str(baseline_bank_amount) + " for " + str(lock_time_in_months) + " months: " + str(round(boost, 2)))
