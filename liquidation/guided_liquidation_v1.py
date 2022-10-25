@@ -67,11 +67,11 @@ def display_balance_data(algofi_client, balances, prices):
 
 def display_target_data(algofi_client, target_address, target_state, target_totals):
     print("{} CURRENT STATE".format(target_address))
-    print("User Max Borrow: {}, User Total Borrow: {}, Health Ratio: {}".format(round(target_totals["max_borrow_usd"], 2),
+    print("User Max Borrow (USD): {}, User Total Borrow (USD): {}, Health Ratio: {}".format(round(target_totals["max_borrow_usd"], 2),
                                                                                 round(target_totals["total_borrow_usd"], 2),
                                                                                 round(target_totals["total_borrow_usd"]/target_totals["max_borrow_usd"], 10)))
     state_table = PrettyTable()
-    state_table.field_names = ["SYMBOL", "COLLATERAL_USD", "BORROW_USD", "COLLATERAL", "BORROW"]
+    state_table.field_names = ["SYMBOL", "COLLATERAL", "BORROW", "COLLATERAL_USD", "BORROW_USD"]
     for symbol, market in algofi_client.get_active_markets().items():
         decimal_scale_factor = 10**market.get_asset().get_underlying_decimals()
         display_borrow_usd = round(target_state[symbol]["borrow_usd"], 2)
@@ -79,7 +79,7 @@ def display_target_data(algofi_client, target_address, target_state, target_tota
         display_borrow = round(target_state[symbol]["borrow_underlying"] / decimal_scale_factor, 6)
         display_collateral = round(target_state[symbol]["active_collateral_underlying"] / decimal_scale_factor, 6)
         if (display_borrow > 0 or display_collateral > 0):
-            state_table.add_row([symbol, display_collateral_usd, display_borrow_usd, display_collateral, display_borrow])
+            state_table.add_row([symbol, display_collateral, display_borrow, display_collateral_usd, display_borrow_usd])
     print(state_table)
 
 # state loaders
@@ -198,7 +198,6 @@ if __name__ == "__main__":
         liquidator_balances = load_borrowable_balances(algofi_client, liquidator_address)
         
         display_balance_data(algofi_client, liquidator_balances, prices)
-        
         display_target_data(algofi_client, target_address, target_state, target_totals)
         
         if not get_user_confirmation("Begin liquidation?"):
