@@ -1,19 +1,9 @@
 # algofi-scripts
-Useful scripts for the Algofi Protocol.
+Scripts for interacting with and querying the Algofi protocol using the Algofi Python SDKs
 
-## Status
-This repo is undergoing continuous development.
+## Liquidation
 
-## Start
-`virtualenv venv`
-
-`pip3 install -r requirements.txt`
-
-## Generate health ratio report + save to disk
-`python3 run_liquidate_report_from_state.py --health_ratio_threshold 0.85 --borrow_threshold 1.0 --html_fpath /path/to/file`
-
-## Generate health ratio report + email
-`python3 run_liquidate_report_from_state.py --health_ratio_threshold 0.25 --borrow_threshold 0.1 --email email@email.com`
-
-## Generate liquidated users report + save to disk
-`python3 liquidation_actions_report.py --block_delta 4000 --html_fpath /path/to/file`
+### Generating health ratio report
+```bash
+python3 liquidation_report_v1.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --health_ratio_threshold [health ratio threshold] --borrow_threshold [dollar borrow threshold] --csv_fpath [csv fpath]
+```
