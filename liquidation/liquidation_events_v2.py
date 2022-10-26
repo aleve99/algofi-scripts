@@ -1,32 +1,49 @@
-import argparse, json, sys
-import requests as re
-import algosdk
+
+# basic imports
+from base64 import b64decode, b64encode
 import pandas as pd
+import argparse
+from pytz import timezone
+from datetime import datetime
 
-from utils import *
-from algofi.v1.client import AlgofiMainnetClient
+# algorand imports
+from algosdk.encoding import encode_address, decode_address
+from algosdk.v2client.algod import AlgodClient
+from algosdk.v2client.indexer import IndexerClient
+
+# algofi imports
+from algofipy.lending.v2.lending_config import MANAGER_STRINGS, MARKET_STRINGS
+from algofipy.algofi_client import AlgofiClient
+from algofipy.globals import Network
+
+def get_time(tz="EST"):
+    tz = timezone(tz)
+    fmt = "%Y-%m-%d %H:%M:%S %Z%z"
+    ts = datetime.now(tz).strftime(fmt)
+    return ts
     
-# save html report to location
-def save_report(html_fpath, html_report):
-    # save html report
-    with open(html_fpath+"liq.html", "w") as html_file:
-        html_file.write(html_report)
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Input processor")
+    parser.add_argument("--algod_uri", type=str, default="https://node.algoexplorerapi.io")
+    parser.add_argument("--algod_token", type=str, default="")
+    parser.add_argument("--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io")
+    parser.add_argument("--indexer_token", type=str, default="")
     parser.add_argument("--block_delta", type=int, default=20000)
-    parser.add_argument("--html_fpath", type=str, required=True)
+    parser.add_argument("--csv_fpath", type=str, required=True)
     args = parser.parse_args()
     
-    algofi_client = AlgofiMainnetClient()
+    # initialize clients
+    algod_client = AlgodClient(args.algod_token, args.algod_uri)
+    indexer_client = IndexerClient(args.indexer_token, args.indexer_uri)
+    algofi_client = AlgofiClient(Network.MAINNET, algod_client, indexer_client)
 
     current_round = algofi_client.indexer.health()["round"]
     start_round = current_round - args.block_delta
-    market_app_ids = algofi_client.get_active_market_app_ids()
-    market_addresses = algofi_client.get_active_market_addresses()
-    market_names = algofi_client.get_active_ordered_symbols()
+    markets = algofi_client.lending.markets
+    market_app_ids = list(markets.keys())
+    market_addresses = [markets[x].address for x in market_app_ids]
+    market_names = [markets[x].name for x in market_app_ids]
     market_id_to_name = dict(zip(market_app_ids, market_names))
-    markets = algofi_client.get_active_markets()
 
     timestamp = get_time()
 
@@ -74,31 +91,35 @@ if __name__ == '__main__':
                         app_args = liq_txn.get("application-transaction", {}).get("application-args", [])
                         if app_args:
                             if app_args[0] == "bA==":
+                                borrow_app_id = liq_txn["application-transaction"]["application-id"]
+                                borrow_market = market_id_to_name[borrow_app_id]
+                                borrow_price = markets[borrow_app_id].oracle.raw_price / 1000000
+                            elif app_args[0] == "c2M=":
                                 accounts = liq_txn.get("application-transaction", {}).get("accounts", [])
-                                if len(accounts) == 2:
-                                    liquidatee = accounts[0]
-                                    liquidator = liq_txn["sender"]
-                                    market_app_id = liq_txn["application-transaction"]["application-id"]
-                                    collateral_market = market_id_to_name[market_app_id]
-                                    inner_txn = liq_txn["inner-txns"][0]
-                                    asset_transfer_txn = inner_txn.get("asset-transfer-transaction", {})
-                                    if asset_transfer_txn:
-                                        collateral_seized_amount = asset_transfer_txn["amount"]
-                                        bank_to_exchange_rate = algofi_client.markets[collateral_market].get_bank_to_underlying_exchange(block=round_)
-                                        collateral_seized_amount *= bank_to_exchange_rate/1e9
-                                    else:
-                                        collateral_seized_amount = inner_txn["inner-txns"][0]["payment-transaction"]["amount"]
-                                    collateral_seized_amount /= 10**(markets[collateral_market].asset.get_underlying_decimals())
-                                elif len(accounts) == 1:
-                                    borrow_market = market_id_to_name[liq_txn["application-transaction"]["application-id"]]
-                                    borrow_price = algofi_client.markets[borrow_market].asset.get_price(block=round_)
+                                liquidatee = accounts[0]
+                                liquidator = liq_txn["sender"]
+                                market_app_id = liq_txn["application-transaction"]["application-id"]
+                                collateral_market = market_id_to_name[market_app_id]
+                                inner_txn = liq_txn["inner-txns"][1]
+                                asset_transfer_txn = inner_txn.get("asset-transfer-transaction", {})
+                                if asset_transfer_txn:
+                                    collateral_seized_amount = asset_transfer_txn["amount"]
+                                    bank_to_exchange_rate = markets[market_app_id].b_asset_to_asset_amount(1e9).underlying / 1e9
+                                    collateral_seized_amount *= bank_to_exchange_rate
+                                else:
+                                    collateral_seized_amount = inner_txn["inner-txns"][0]["payment-transaction"]["amount"]
+                                decimals = markets[market_app_id].lending_client.algofi_client.assets[markets[market_app_id].underlying_asset_id].decimals
+                                collateral_seized_amount /= 10**(decimals)
+                            else:
+                                print(app_args[0])
                         else:
                             asset_transfer_txn = liq_txn.get("asset-transfer-transaction", {})
                             if asset_transfer_txn:
                                 repay_amount = asset_transfer_txn["amount"]
                             else:
                                 repay_amount = liq_txn["payment-transaction"]["amount"]
-                    repay_amount /= 10**(markets[borrow_market].asset.get_underlying_decimals())
+                    borrow_decimals = markets[borrow_app_id].lending_client.algofi_client.assets[markets[borrow_app_id].underlying_asset_id].decimals
+                    repay_amount /= 10**borrow_decimals
                     data_dict["Time"].append(timestamp)
                     data_dict["Group"].append(gid)
                     data_dict["Liquidator"].append(liquidator)
@@ -109,9 +130,6 @@ if __name__ == '__main__':
                     data_dict["Collateral Seized"].append(collateral_seized_amount)
                     data_dict["Profit [$]"].append(0.07 * repay_amount * borrow_price)
                     groups_calced.append(gid)
+
     df = pd.DataFrame(data_dict).sort_values(by='Time')
-    borrow_report = df.groupby("Borrow Market").sum()[["Repay Amount"]].to_html()
-    collateral_report = df.groupby("Collateral Market").sum()[["Collateral Seized"]].to_html()
-    report = df.to_html()
-    if args.html_fpath:
-        save_report(args.html_fpath, borrow_report + "<br>" + collateral_report + "<br>" + report)
+    df.to_csv(args.csv_fpath + "v2-liquidation-events-data-%s.csv" % timestamp)
