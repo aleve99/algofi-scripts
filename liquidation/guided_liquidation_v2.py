@@ -33,7 +33,7 @@ def get_user_confirmation(prompt):
         confirmation = input(prompt + " (y/n): ").lower()
         if confirmation in ["y", "n"]:
             return confirmation == "y"
-        print("Invalid input, '{}'".format(confirmation))
+        print("Invalid input, "{}"".format(confirmation))
 
 def get_user_selection(header, options):
     print(header)
@@ -43,7 +43,7 @@ def get_user_selection(header, options):
         selection = input("Enter selection: ")
         if selection.isdigit() and int(selection) in options.keys():
             return options[int(selection)]
-        print("Invalid input, '{}'".format(selection))
+        print("Invalid input, "{}"".format(selection))
 
 def get_user_numeric_value(prompt, min_value, max_value, default_value):
     while True:
