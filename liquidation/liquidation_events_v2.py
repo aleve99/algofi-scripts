@@ -132,4 +132,4 @@ if __name__ == '__main__':
                     groups_calced.append(gid)
 
     df = pd.DataFrame(data_dict).sort_values(by='Time')
-    df.to_csv(args.csv_fpath + "v2-liquidation-events-data-%s.csv" % timestamp)
+    df.to_csv(args.csv_fpath + "v2-liquidation-events-%s.csv" % timestamp)

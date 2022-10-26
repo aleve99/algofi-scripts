@@ -236,5 +236,5 @@ if __name__ == "__main__":
         dollarized_borrow_threshold=float(args.borrow_threshold)
     )
 
-    summary_df.to_csv(args.csv_fpath+"v2-liquidation-summary-data-%s.csv" % timestamp)
-    drilldown_df.to_csv(args.csv_fpath+"v2-liquidation-drilldown-data-%s.csv" % timestamp)
+    summary_df.to_csv(args.csv_fpath+"v2-liquidation-summary-%s.csv" % timestamp)
+    drilldown_df.to_csv(args.csv_fpath+"v2-liquidation-drilldown-%s.csv" % timestamp)

@@ -124,4 +124,4 @@ if __name__ == '__main__':
                     data_dict["Profit [$]"].append(0.07 * repay_amount * borrow_price)
                     groups_calced.append(gid)
     df = pd.DataFrame(data_dict).sort_values(by='Time')
-    df.to_csv(args.csv_fpath + "v1-liquidation-events-data-%s.csv" % timestamp)
+    df.to_csv(args.csv_fpath + "v1-liquidation-events-%s.csv" % timestamp)

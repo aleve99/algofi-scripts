@@ -174,5 +174,5 @@ if __name__ == "__main__":
         args.borrow_threshold,
     )
 
-    summary_df.to_csv(args.csv_fpath+"v1-liquidation-summary-data-%s.csv" % timestamp)
-    drilldown_df.to_csv(args.csv_fpath+"v1-liquidation-drilldown-data-%s.csv" % timestamp)
+    summary_df.to_csv(args.csv_fpath+"v1-liquidation-summary-%s.csv" % timestamp)
+    drilldown_df.to_csv(args.csv_fpath+"v1-liquidation-drilldown-%s.csv" % timestamp)
