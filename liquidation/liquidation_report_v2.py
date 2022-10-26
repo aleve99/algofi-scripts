@@ -1,15 +1,10 @@
 
 # basic imports
-import pprint
-from dotenv import dotenv_values
 from base64 import b64decode, b64encode
 import pandas as pd
 import argparse
 from pytz import timezone
 from datetime import datetime
-
-# formating helper
-from prettytable import PrettyTable
 
 # algorand imports
 from algosdk.encoding import encode_address, decode_address
@@ -86,7 +81,7 @@ class AlgofiUserState:
         elif borrow:
             self.market_states[market_app_id].set_borrow(borrow)
 
-def get_liquidate_data(algofi_client):
+def get_liquidation_data(algofi_client):
     # app id for the manager
     manager_app_id = algofi_client.lending.manager_config.app_id
     next_page = ""
@@ -179,7 +174,7 @@ def process_liquidation_data(timestamp, liquidate_data, health_ratio_threshold, 
     drilldown_df = pd.DataFrame(drilldown_dict)
     summary_df = pd.DataFrame(summary_dict).sort_values("Health Ratio", ascending=False)
     drilldown_df["Timestamp"] = timestamp
-    summary_df["Timestamp"] =timestamp
+    summary_df["Timestamp"] = timestamp
 
     return (summary_df, drilldown_df)
 
@@ -231,12 +226,12 @@ if __name__ == "__main__":
     algofi_client = AlgofiClient(Network.MAINNET, algod_client, indexer_client)
 
     # get the liquidation data from state for crosscheck
-    liquidate_data = get_liquidate_data(algofi_client)
+    liquidation_data = get_liquidation_data(algofi_client)
 
     # generate liquidation csvs
     (summary_df, drilldown_df) = process_liquidation_data(
         timestamp=timestamp,
-        liquidate_data=liquidate_data,
+        liquidate_data=liquidation_data,
         health_ratio_threshold=float(args.health_ratio_threshold),
         dollarized_borrow_threshold=float(args.borrow_threshold)
     )

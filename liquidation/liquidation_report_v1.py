@@ -1,6 +1,20 @@
 
-from utils import *
+# basic imports
+from base64 import b64decode, b64encode
+import pandas as pd
+import argparse
+from pytz import timezone
+from datetime import datetime
 
+# algorand imports
+from algosdk import account, encoding, mnemonic
+from algosdk.v2client.algod import AlgodClient
+from algosdk.v2client.indexer import IndexerClient
+
+# algofi imports
+from algofi.v1.client import AlgofiMainnetClient
+from algofi.contract_strings import algofi_market_strings as market_strings
+from algofi.contract_strings import algofi_manager_strings as manager_strings
 
 def process_storage_account_data(algofi_client, storage_account_data, decimal_scale_factors, market_app_ids, prices, exch_rates, underlying_borrowed_data, outstanding_borrow_shares_data, collateral_factors):
     # process data
@@ -21,15 +35,16 @@ def process_storage_account_data(algofi_client, storage_account_data, decimal_sc
                 data = format_state_simple(app_data["key-value"])
                 # get dollarized borrow
                 price = prices[app_data["id"]]
-                if field_mappings[market_strings.user_borrow_shares] in data:
-                    borrow_shares = data[field_mappings[market_strings.user_borrow_shares]]
+                borrow_shares = data.get(b64encode(bytes(market_strings.user_borrow_shares, "utf-8")).decode("utf-8"), 0)
+                if borrow_shares:
                     borrow_token = (borrow_shares * underlying_borrowed_data[app_data["id"]]) / outstanding_borrow_shares_data[app_data["id"]] / decimal_scale_factors[app_data["id"]]
                     borrow_usd = borrow_token * price
                     borrow += borrow_usd
                 # get dollarized max borrow
-                if field_mappings[market_strings.user_active_collateral] in data:
+                active_collateral_token = data.get(b64encode(bytes(market_strings.user_active_collateral, "utf-8")).decode("utf-8"), 0)
+                if active_collateral_token:
                     exch_rate = exch_rates[app_data["id"]]
-                    active_collateral_token = data[field_mappings[market_strings.user_active_collateral]] / decimal_scale_factors[app_data["id"]] * exch_rate
+                    active_collateral_token = active_collateral_token / decimal_scale_factors[app_data["id"]] * exch_rate
                     active_collateral_usd = active_collateral_token * price
                     max_borrow += active_collateral_usd * collateral_factors[app_data["id"]]
             market_counter += 1
@@ -39,7 +54,7 @@ def process_storage_account_data(algofi_client, storage_account_data, decimal_sc
             data_dict["borrow"] = borrow
             return data_dict
 
-def get_user_health_ratios_from_state(algofi_client):
+def get_liquidation_data(algofi_client):
     # load market specific data
     markets = [algofi_client.markets[x] for x in algofi_client.get_active_markets()]
     market_app_ids = algofi_client.get_active_market_app_ids()
@@ -57,47 +72,20 @@ def get_user_health_ratios_from_state(algofi_client):
     prices = dict(zip(market_app_ids, price))
 
     # iterate over storage accounts
-    storage_accounts = get_accounts_from_algo_market(algofi_client)
+    #storage_accounts = get_accounts_from_algo_market(algofi_client)
+    storage_accounts = algofi_client.get_storage_accounts(verbose=True)
     user_health_ratio_data = {}
     for storage_account_data in storage_accounts:
         storage_account = storage_account_data.get("address", "")
         user_health_ratio_data[storage_account] = process_storage_account_data(algofi_client, storage_account_data, decimal_scale_factors, market_app_ids, prices, exch_rates, underlying_borrowed_data, outstanding_borrow_shares_data, collateral_factors)
     return user_health_ratio_data
 
-def get_user_data_one_off(algofi_client, storage_account):
-    # load market specific data
-    markets = [algofi_client.markets[x] for x in algofi_client.get_active_markets()]
-    market_app_ids = algofi_client.get_active_market_app_ids()
-    bank_to_underlying_exchange_rates = [market.get_bank_to_underlying_exchange() for market in markets]
-    exch_rates = dict(zip(market_app_ids, scale_values(bank_to_underlying_exchange_rates, 1./algofi_client.SCALE_FACTOR)))
-    underlying_borrowed = [market.get_underlying_borrowed() for market in markets]
-    underlying_borrowed_data = dict(zip(market_app_ids, underlying_borrowed))
-    outstanding_borrow_shares = [market.get_outstanding_borrow_shares() for market in markets]
-    outstanding_borrow_shares_data = dict(zip(market_app_ids, outstanding_borrow_shares))
-    coll_factors = [market.get_collateral_factor() for market in markets]
-    collateral_factors = dict(zip(market_app_ids, scale_values(coll_factors, 1./algofi_client.PARAMETER_SCALE_FACTOR)))
-    decimals = [10**market.asset.get_underlying_decimals() for market in markets]
-    decimal_scale_factors = dict(zip(market_app_ids, decimals))
-    price = [market.asset.get_price() for market in markets]
-    prices = dict(zip(market_app_ids, price))
-    # iterate over storage accounts
-    user_health_ratio_data = {}
-    user_health_ratio_data[storage_account] = get_user_data(algofi_client, storage_account, decimal_scale_factors, market_app_ids, prices, exch_rates, underlying_borrowed_data, outstanding_borrow_shares_data, collateral_factors)
-    return user_health_ratio_data
-
-# save html + csv report to location
-def save_report(html_path, data, html_report):
-    # save html report
-    with open(html_path+"index.html", "w") as html_file:
-        html_file.write(html_report)
-    data.to_csv(html_path+"data.csv")
-
 # convert txns_processed to a reasonable csv for testing the liquidation bot script
-def get_liquidation_report(algofi_client, timestamp, liquidate_data, health_ratio_threshold, dollarized_borrow_threshold, phone_numbers):
+def process_liquidation_data(algofi_client, timestamp, liquidate_data, health_ratio_threshold, dollarized_borrow_threshold):
     round_decimals = 3
-    data_dict = {"Storage Account": [], "Max Borrow": [], "Borrow": [], "Health Ratio": []}
-    drilldown_report = ""
-    num_liquidatable_users = 0
+    summary_dict = {"Storage Account": [], "Max Borrow": [], "Borrow": [], "Health Ratio": []}
+    drilldown_dict = {"Storage Account": [], "Symbol":[], "Collateral":[], "Borrow":[], "Collateral (USD)":[], "Borrow (USD)":[]}
+
     for user in liquidate_data:
         data = liquidate_data[user]
         if not data:
@@ -105,70 +93,86 @@ def get_liquidation_report(algofi_client, timestamp, liquidate_data, health_rati
         borrow = round(float(data["borrow"]),round_decimals)
         max_borrow = round(float(data["max_borrow"]),round_decimals)
         if (borrow >= max_borrow*health_ratio_threshold) and (borrow >= dollarized_borrow_threshold) and (borrow != 0 and max_borrow != 0):
-            data_dict["Storage Account"].append(user)
-            data_dict["Max Borrow"].append(max_borrow)
-            data_dict["Borrow"].append(borrow)
+            summary_dict["Storage Account"].append(user)
+            summary_dict["Max Borrow"].append(max_borrow)
+            summary_dict["Borrow"].append(borrow)
             health_ratio = round(float(data["borrow"] / data["max_borrow"]),round_decimals)
-            data_dict["Health Ratio"].append(health_ratio)
-            drilldown_dict = {"symbol":[], "collateral_token":[], "collateral_usd":[], "borrow_token":[], "borrow_usd":[]}
+            summary_dict["Health Ratio"].append(health_ratio)
             for symbol in algofi_client.get_active_markets():
                 if (data[symbol]["borrow_usd"] > 0) or (data[symbol]["collateral_usd"] > 0):
-                    drilldown_dict["symbol"].append(symbol)
-                    drilldown_dict["collateral_token"].append(round(float(data[symbol]["collateral_token"]),round_decimals))
-                    drilldown_dict["collateral_usd"].append(round(float(data[symbol]["collateral_usd"]),round_decimals))
-                    drilldown_dict["borrow_token"].append(round(float(data[symbol]["borrow_token"]), round_decimals))
-                    drilldown_dict["borrow_usd"].append(round(float(data[symbol]["borrow_usd"]), round_decimals))
-            drilldown = pd.DataFrame(drilldown_dict)
-            drilldown = drilldown.sort_values(by="borrow_usd")
-            drilldown_report += user+"<br>"+drilldown.to_html()
+                    drilldown_dict["Storage Account"].append(user)
+                    drilldown_dict["Symbol"].append(symbol)
+                    drilldown_dict["Collateral"].append(round(float(data[symbol]["collateral_token"]),round_decimals))
+                    drilldown_dict["Borrow"].append(round(float(data[symbol]["borrow_token"]), round_decimals))
+                    drilldown_dict["Collateral (USD)"].append(round(float(data[symbol]["collateral_usd"]),round_decimals))
+                    drilldown_dict["Borrow (USD)"].append(round(float(data[symbol]["borrow_usd"]), round_decimals))
 
-            if (health_ratio >= 1.0):
-                num_liquidatable_users += 1
+    drilldown_df = pd.DataFrame(drilldown_dict)
+    summary_df = pd.DataFrame(summary_dict).sort_values("Health Ratio", ascending=False)
+    drilldown_df["Timestamp"] = timestamp
+    summary_df["Timestamp"] = timestamp
 
-    data = pd.DataFrame(data_dict).sort_values("Health Ratio", ascending=False)
-    html_report = "Time: " + timestamp + "<br>" + data.to_html() + "<br>" + drilldown_report
-    if phone_numbers and (num_liquidatable_users > 0):
-        for phone_number in phone_numbers:
-            send_text_alert(phone_number, "ALERT: Liquidatable Users")
-    data['Timestamp'] = timestamp
-    return (data, html_report, num_liquidatable_users)
+    return (summary_df, drilldown_df)
 
-def main():
+def get_time(tz="EST"):
+    tz = timezone(tz)
+    fmt = "%Y-%m-%d %H:%M:%S %Z%z"
+    ts = datetime.now(tz).strftime(fmt)
+    return ts
+
+def scale_values(array, scalar):
+    return [x * scalar for x in array]
+
+def format_state_simple(state):
+    """Returns state dict formatted to human-readable strings
+
+    :param state: dict of state returned by read_local_state or read_global_state
+    :type state: dict
+    :return: dict of state with keys + values formatted from bytes to utf-8 strings
+    :rtype: dict
+    """
+    formatted = {}
+    for item in state:
+        key = item["key"]
+        value = item["value"]
+        if value["type"] == 1:
+            formatted[key] = value["bytes"]
+        else:
+            # integer
+            formatted[key] = value["uint"]
+    return formatted
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Input processor")
-    parser.add_argument("--bootstrap", action="store_true", default=False)
-    parser.add_argument("--phone_numbers", default="")
-    parser.add_argument("--algod_network", default="ae_mainnet")
-    parser.add_argument("--indexer_network", default="ae_mainnet")
-    parser.add_argument("--storage_account", default="")
-    parser.add_argument("--health_ratio_threshold", default=0.85)
-    parser.add_argument("--borrow_threshold", default=1.)
-    parser.add_argument("--email", default="")
-    parser.add_argument("--html_fpath", default="")
+    parser.add_argument("--algod_uri", type=str, default="https://node.algoexplorerapi.io")
+    parser.add_argument("--algod_token", type=str, default="")
+    parser.add_argument("--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io")
+    parser.add_argument("--indexer_token", type=str, default="")
+    parser.add_argument("--health_ratio_threshold", type=float, default=0.85)
+    parser.add_argument("--borrow_threshold", type=float, default=1.)
+    parser.add_argument("--csv_fpath", type=str, required=True)
 
     args = parser.parse_args()
 
     # get time
     timestamp = get_time()
-    algofi_client = get_client(args.algod_network, args.indexer_network)
 
-    if args.storage_account:
-        # get a user"s specific collateral + borrow
-        print(get_user_data_one_off(algofi_client, args.storage_account))
-    elif args.bootstrap:
-        # get the liquidation data from state for crosscheck
-        user_health_ratio_data = get_user_health_ratios_from_state(algofi_client)
+    # initialize clients
+    algod_client = AlgodClient(args.algod_token, args.algod_uri)
+    indexer_client = IndexerClient(args.indexer_token, args.indexer_uri)
+    algofi_client = AlgofiMainnetClient(algod_client, indexer_client)
+
+    # get the liquidation data from state for crosscheck
+    liquidation_data = get_liquidation_data(algofi_client)
     
-    if args.email or args.html_fpath:
-        # generate liquidation report
-        phone_numbers = args.phone_numbers.split(",")
-        (data, liquidation_report, num_liquidatable_users) = get_liquidation_report(algofi_client, timestamp, user_health_ratio_data, float(args.health_ratio_threshold), float(args.borrow_threshold), phone_numbers)
-        # email report to stake holders
-        if args.email and (num_liquidatable_users > 0):
-            email_report(args.email, "Liquidation Report from State: " + str(timestamp), liquidation_report)
-        # save html + csv report
-        if args.html_fpath:
-            save_report(args.html_fpath, data, liquidation_report)
+    # generate liquidation report
+    (summary_df, drilldown_df) = process_liquidation_data(
+        algofi_client,
+        timestamp,
+        liquidation_data,
+        args.health_ratio_threshold,
+        args.borrow_threshold,
+    )
 
-
-if __name__ == "__main__":
-    main()
+    summary_df.to_csv(args.csv_fpath+"v1-liquidation-summary-data-%s.csv" % timestamp)
+    drilldown_df.to_csv(args.csv_fpath+"v1-liquidation-drilldown-data-%s.csv" % timestamp)
