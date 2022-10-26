@@ -17,7 +17,8 @@ from algosdk import logic, mnemonic, account
 from algofipy.algofi_client import AlgofiClient
 from algofipy.globals import Network
 from algofipy.transaction_utils import wait_for_confirmation, TransactionGroup, get_default_params
-from algofipy.governance.v1.governance_config import ADMIN_STRINGS
+from algofipy.governance.v1.governance_config import ADMIN_STRINGS, VOTING_ESCROW_STRINGS
+from algofipy.governance.v1.user_voting_escrow_state import UserVotingEscrowState
 
 def get_update_user_vebank_txns(client, sender, user_to_update, user_to_update_storage_address):
     params = get_default_params(client.algod)
@@ -81,14 +82,18 @@ if __name__ == '__main__':
 
     # query governance users
     print("Querying governance users...")
-    governor_addresses = client.governance.get_governors()
-    governors = []
-    for address in governor_addresses:
-        user = client.governance.get_user(address)
-        storage_address = user.user_admin_state.storage_address
-        governors.append((address, storage_address, user))
-    primary = dict([(primary_address, governor) for (primary_address, _, governor) in governors])
-    storage = dict([(storage_address, governor) for (_, storage_address, governor) in governors])
+    (governor_admin_state, storage_mapping) = client.governance.get_governor_admin_state()
+    governor_voting_escrow_state = client.governance.get_governor_voting_escrow_state()
+    governor_addresses = list(set(list(governor_admin_state.keys()) + list(governor_voting_escrow_state.keys())))
+    governor_state = {}
+    for governor_address in governor_addresses:
+        admin_state = governor_admin_state.get(governor_address, {})
+        voting_escrow_state = governor_voting_escrow_state.get(governor_address, {})
+        if admin_state and voting_escrow_state:
+            governor_state[governor_address] = {
+                "admin": admin_state,
+                "voting_escrow": voting_escrow_state
+            }
 
     # query proposals
     print("Querying proposals...")
@@ -99,20 +104,20 @@ if __name__ == '__main__':
         # check if proposal is open for voting
         is_proposal_open_for_voting = int(time.time()) < proposal.vote_close_time
         if is_proposal_open_for_voting:
+            proposal_data = client.governance.get_governor_proposal_state(proposal_app_id)
             # iterate over governors and check constraints
-            for governor_address in primary:
-                governor = primary[governor_address]
-                delegating_to = governor.user_admin_state.delegating_to
-                amount_vebank = client.governance.voting_escrow.get_projected_vebank_amount(governor.user_voting_escrow_state)
+            for governor_address in governor_state:
+                delegating_to = governor_state[governor_address]["admin"]["delegating_to"]
+                amount_vebank = client.governance.voting_escrow.get_projected_vebank_amount(UserVotingEscrowState(governor_state[governor_address]["voting_escrow"]))
                 # check governor is delegating to and they have vebank
                 if delegating_to and amount_vebank > 0:
-                    voter = governor.address
-                    voter_storage_address = governor.user_admin_state.storage_address
-                    delegate_user = storage[delegating_to]
-                    user_open_to_delegation = delegate_user.user_admin_state.open_to_delegation
+                    voter_storage_address = governor_state[governor_address]["admin"]["storage_account"]
+                    user_open_to_delegation = governor_state[storage_mapping[delegating_to]]["admin"]["open_to_delegation"]
+                    delegate_voted = delegating_to in proposal_data
+                    governor_voted = voter_storage_address in proposal_data
                     # check delegate voted and governor did not vote
-                    if user_open_to_delegation and delegate_user.voted_in_proposal(proposal_app_id) and not governor.voted_in_proposal(proposal_app_id):
-                        print("Voting for " + voter + " with " + delegating_to + " as delegate for proposal " + str(proposal_app_id))
-                        txn = get_delegated_vote_txns(client, keeper, voter, voter_storage_address, delegating_to, proposal_app_id)
+                    if user_open_to_delegation and delegate_voted and not governor_voted:
+                        print("Voting for " + governor_address + " with " + delegating_to + " as delegate for proposal " + str(proposal_app_id))
+                        txn = get_delegated_vote_txns(client, keeper, governor_address, voter_storage_address, delegating_to, proposal_app_id)
                         txn.sign_with_private_key(keeper_key)
                         txn.submit(algod_client, wait=False)
