@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument("--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io")
     parser.add_argument("--indexer_token", type=str, default="")
     parser.add_argument("--csv_fpath", type=str, required=True)
+    parser.add_argument("--html_fpath", type=str)
     args = parser.parse_args()
 
     algod_client = AlgodClient(args.algod_token, args.algod_uri)
@@ -87,3 +88,7 @@ if __name__ == '__main__':
     delegate_summary_df["Percentage"] = list(map(lambda x: round(x / total_vebank * 100, 1), list(delegate_summary_df["Total [k]"])))
     delegate_summary_df = delegate_summary_df.sort_values(by=["Percentage"], ascending=False)
     delegate_summary_df.to_csv(args.csv_fpath+"delegate-report-%s.csv" % timestamp)
+
+    if args.html_fpath:
+        with open(args.html_fpath + "delegates.html", "w") as f:
+            f.write(delegate_summary_df.to_html())
