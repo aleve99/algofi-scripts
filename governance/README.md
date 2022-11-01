@@ -15,6 +15,11 @@ python3 vebank_update.py --algod_uri [algod node uri] --algod_token [algod node 
 python3 delegate_report.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --csv_fpath [csv fpath]
 ```
 
+### Closing out vote accounts
+```bash
+python3 close_out_vote_accounts.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --env_fpath [fpath to env vars]
+```
+
 ### Simulating max boost staking scenarios
 ```bash
 python3 max_boost_simulate.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --bank_amount [amount of BANK to lock] --staked_amts [comma-delimited list of asset stake amounts]
