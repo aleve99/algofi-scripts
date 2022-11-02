@@ -22,6 +22,7 @@ from algofipy.governance.v1.user_voting_escrow_state import UserVotingEscrowStat
 
 def close_out_of_proposal(client, user_sending, storage_address_closing_out, proposal_app_id):
     params = get_default_params(client.algod)
+    params.fee = 3000
 
     txn0 = ApplicationNoOpTxn(
         sender=user_sending,
@@ -87,4 +88,4 @@ if __name__ == '__main__':
                     print("Opting out " + voter_storage_address + " from proposal " + str(proposal_app_id))
                     txn = close_out_of_proposal(client, keeper, voter_storage_address, proposal_app_id)
                     txn.sign_with_private_key(keeper_key)
-                    #txn.submit(client.algod, wait=False)
+                    txn.submit(client.algod, wait=False)
