@@ -74,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument("--algod_token", type=str, default="")
     parser.add_argument("--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io")
     parser.add_argument("--indexer_token", type=str, default="")
-    parser.add_argument("--pct_threshold", type=int, default=0.5)
+    parser.add_argument("--pct_threshold", type=int, default=5)
     parser.add_argument("--env_fpath", type=str, required=True)
     args = parser.parse_args()
 
