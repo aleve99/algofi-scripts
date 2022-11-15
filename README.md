@@ -1,3 +1,5 @@
+![algofi-scripts](https://user-images.githubusercontent.com/18899131/201798470-e5831f45-9e57-42de-bf0c-de26e1b1812c.jpg)
+
 # algofi-scripts
 Scripts for interacting with and querying the Algofi protocol using the Algofi Python SDKs
 
