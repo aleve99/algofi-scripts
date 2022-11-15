@@ -28,12 +28,14 @@ def is_number(string):
     except ValueError:
         return False
 
+
 def get_user_confirmation(prompt):
     while True:
         confirmation = input(prompt + " (y/n): ").lower()
         if confirmation in ["y", "n"]:
             return confirmation == "y"
-        print("Invalid input, "{}"".format(confirmation))
+        print("Invalid input, '{}'".format(confirmation))
+
 
 def get_user_selection(header, options):
     print(header)
@@ -43,23 +45,31 @@ def get_user_selection(header, options):
         selection = input("Enter selection: ")
         if selection.isdigit() and int(selection) in options.keys():
             return options[int(selection)]
-        print("Invalid input, "{}"".format(selection))
+        print("Invalid input, '{}'".format(selection))
+
 
 def get_user_numeric_value(prompt, min_value, max_value, default_value):
     while True:
-        value = input(prompt + " min:{} max:{} default:{}: ".format(str(min_value), str(max_value), str(default_value)))
+        value = input(
+            prompt
+            + " min:{} max:{} default:{}: ".format(
+                str(min_value), str(max_value), str(default_value)
+            )
+        )
         if value == "":
             return default_value
         if is_number(value) and float(value) > min_value and float(value) < max_value:
             return float(value)
         print("Invalid input, {}".format(value))
 
+
 def get_prices(algofi_client):
     prices = {}
     for market in algofi_client.lending.markets.values():
-        unit_amount = 10**(algofi_client.assets[market.underlying_asset_id].decimals)
+        unit_amount = 10 ** (algofi_client.assets[market.underlying_asset_id].decimals)
         prices[market.name] = market.underlying_to_usd(unit_amount * 1e9) / 1e9
     return prices
+
 
 def get_market_name_to_id(algofi_client):
     market_name_to_id = {}
@@ -67,7 +77,8 @@ def get_market_name_to_id(algofi_client):
     for market_app_id, market in algofi_client.lending.markets.items():
         market_name_to_id[market.name] = market_app_id
         i += 1
-    return  market_name_to_id
+    return market_name_to_id
+
 
 def get_repay_markets(algofi_client, liquidator_balances):
     market_names = {}
@@ -77,6 +88,7 @@ def get_repay_markets(algofi_client, liquidator_balances):
             market_names[i] = market.name
             i += 1
     return market_names
+
 
 def get_seize_markets(algofi_client, liquidatee_user):
     market_names = {}
@@ -89,7 +101,10 @@ def get_seize_markets(algofi_client, liquidatee_user):
                 i += 1
     return market_names
 
+
 DUPLICATE_ASSET_MARKETS = ["vALGO"]
+
+
 def load_borrowable_balances(liquidator_user):
     print("USER BALANCES:")
     print("----------")
@@ -99,7 +114,8 @@ def load_borrowable_balances(liquidator_user):
             balance = liquidator_user.balances.get(market.underlying_asset_id, 0)
             user_balances[market.name] = balance
     return user_balances
-    
+
+
 def display_balance_data(algofi_client, balances, prices):
     state_table = PrettyTable()
     print("Liquidator Borrowable Asset Balances")
@@ -109,41 +125,88 @@ def display_balance_data(algofi_client, balances, prices):
         if symbol not in DUPLICATE_ASSET_MARKETS:
             if balances[symbol] == 0:
                 continue
-            display_balance = round(balances[symbol] / 10**algofi_client.assets[market.underlying_asset_id].decimals, 6)
+            display_balance = round(
+                balances[symbol]
+                / 10 ** algofi_client.assets[market.underlying_asset_id].decimals,
+                6,
+            )
             display_balance_usd = round(display_balance * prices[symbol], 2)
             state_table.add_row([symbol, display_balance, display_balance_usd])
     print(state_table)
 
-def display_target_data(algofi_client, target_address, liquidatee_user, liquidator_balances):
+
+def display_target_data(
+    algofi_client, target_address, liquidatee_user, liquidator_balances
+):
     print("{} CURRENT STATE".format(target_address))
-    print("User Max Borrow (USD): {}, User Total Borrow (USD): {}, Health Ratio: {}".format(round(liquidatee_user.net_scaled_collateral, 2),
-                                                                                round(liquidatee_user.net_borrow, 2),
-                                                                                round(liquidatee_user.net_borrow/liquidatee_user.net_scaled_collateral, 10)))
+    print(
+        "User Max Borrow (USD): {}, User Total Borrow (USD): {}, Health Ratio: {}".format(
+            round(liquidatee_user.net_scaled_collateral, 2),
+            round(liquidatee_user.net_borrow, 2),
+            round(
+                liquidatee_user.net_borrow / liquidatee_user.net_scaled_collateral, 10
+            ),
+        )
+    )
     state_table = PrettyTable()
-    state_table.field_names = ["SYMBOL", "COLLATERAL", "BORROW", "COLLATERAL_USD", "BORROW_USD", "CAN REPAY"]
+    state_table.field_names = [
+        "SYMBOL",
+        "COLLATERAL",
+        "BORROW",
+        "COLLATERAL_USD",
+        "BORROW_USD",
+        "CAN REPAY",
+    ]
     for market_app_id, market in algofi_client.lending.markets.items():
         user_market_state = liquidatee_user.user_market_states.get(market_app_id, {})
         if user_market_state:
             symbol = market.name
-            decimal_scale_factor = 10**algofi_client.assets[market.underlying_asset_id].decimals
+            decimal_scale_factor = (
+                10 ** algofi_client.assets[market.underlying_asset_id].decimals
+            )
             display_borrow_usd = round(user_market_state.borrowed_underlying.usd, 2)
-            display_collateral_usd = round(user_market_state.b_asset_collateral_underlying.usd, 2)
-            display_borrow = round(user_market_state.borrowed_underlying.underlying / decimal_scale_factor, 6)
-            display_collateral = round(user_market_state.b_asset_collateral_underlying.underlying / decimal_scale_factor, 6)
-            if (display_borrow > 0 or display_collateral > 0):
-                state_table.add_row([symbol, display_collateral, display_borrow, display_collateral_usd, display_borrow_usd, "X" if (liquidator_balances.get(symbol, 0) and display_borrow_usd) else ""])
+            display_collateral_usd = round(
+                user_market_state.b_asset_collateral_underlying.usd, 2
+            )
+            display_borrow = round(
+                user_market_state.borrowed_underlying.underlying / decimal_scale_factor,
+                6,
+            )
+            display_collateral = round(
+                user_market_state.b_asset_collateral_underlying.underlying
+                / decimal_scale_factor,
+                6,
+            )
+            if display_borrow > 0 or display_collateral > 0:
+                state_table.add_row(
+                    [
+                        symbol,
+                        display_collateral,
+                        display_borrow,
+                        display_collateral_usd,
+                        display_borrow_usd,
+                        "X"
+                        if (liquidator_balances.get(symbol, 0) and display_borrow_usd)
+                        else "",
+                    ]
+                )
     print(state_table)
+
 
 if __name__ == "__main__":
     # get network from user
     parser = argparse.ArgumentParser(description="Input processor")
-    parser.add_argument("--algod_uri", type=str, default="https://node.algoexplorerapi.io")
+    parser.add_argument(
+        "--algod_uri", type=str, default="https://node.algoexplorerapi.io"
+    )
     parser.add_argument("--algod_token", type=str, default="")
-    parser.add_argument("--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io")
+    parser.add_argument(
+        "--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io"
+    )
     parser.add_argument("--indexer_token", type=str, default="")
     parser.add_argument("--env_fpath", type=str, required=True)
     args = parser.parse_args()
-    
+
     # load in mnemonic
     env_vars = dotenv_values(args.env_fpath)
     liquidator_key = mnemonic.to_private_key(env_vars["mnemonic"])
@@ -159,18 +222,22 @@ if __name__ == "__main__":
     # liquidation loop
     target_address = None
     while True:
-    
+
         # get liquidatee address
         if target_address == None:
             target_address = input("Enter liquidatee storage account target address: ")
-        elif not get_user_confirmation("Continue liquidating {}?:".format(target_address)):
+        elif not get_user_confirmation(
+            "Continue liquidating {}?:".format(target_address)
+        ):
             target_address = input("Enter liquidatee storage account target address: ")
 
         algofi_client.lending.load_state()
 
         print("loading target state...")
         try:
-            liquidatee_primary_address = algofi_client.lending.get_user_account(target_address)
+            liquidatee_primary_address = algofi_client.lending.get_user_account(
+                target_address
+            )
             liquidatee_user = algofi_client.lending.get_user(liquidatee_primary_address)
         except:
             print("Failed to load user with storage account address " + target_address)
@@ -183,42 +250,85 @@ if __name__ == "__main__":
         liquidator_balances = load_borrowable_balances(liquidator_user)
 
         display_balance_data(algofi_client, liquidator_balances, prices)
-        display_target_data(algofi_client, target_address, liquidatee_user, liquidator_balances)
+        display_target_data(
+            algofi_client, target_address, liquidatee_user, liquidator_balances
+        )
 
         if not get_user_confirmation("Begin liquidation?"):
             continue
 
-        repay_market_names = get_repay_markets(algofi_client, liquidator_balances)        
-        repay_market = algofi_client.lending.markets[market_name_to_id[get_user_selection("Select repay market", repay_market_names)]]
+        repay_market_names = get_repay_markets(algofi_client, liquidator_balances)
+        repay_market = algofi_client.lending.markets[
+            market_name_to_id[
+                get_user_selection("Select repay market", repay_market_names)
+            ]
+        ]
 
-        decimals = 10**algofi_client.assets[repay_market.underlying_asset_id].decimals
-        max_liquidation = min(int(liquidatee_user.user_market_states[repay_market.app_id].borrowed_underlying.underlying * decimals), liquidator_user.balances[repay_market.underlying_asset_id])
-        repay_amount = int(get_user_numeric_value("Enter amount to liquidate.", 0, max_liquidation, max_liquidation * DEFAULT_TAKE_PERCENTAGE))
+        decimals = 10 ** algofi_client.assets[repay_market.underlying_asset_id].decimals
+        max_liquidation = min(
+            int(
+                liquidatee_user.user_market_states[
+                    repay_market.app_id
+                ].borrowed_underlying.underlying
+                * decimals
+            ),
+            liquidator_user.balances[repay_market.underlying_asset_id],
+        )
+        repay_amount = int(
+            get_user_numeric_value(
+                "Enter amount to liquidate.",
+                0,
+                max_liquidation,
+                max_liquidation * DEFAULT_TAKE_PERCENTAGE,
+            )
+        )
 
         seize_market_names = get_seize_markets(algofi_client, liquidatee_user)
-        seize_market = algofi_client.lending.markets[market_name_to_id[get_user_selection("Select seize market", seize_market_names)]]
+        seize_market = algofi_client.lending.markets[
+            market_name_to_id[
+                get_user_selection("Select seize market", seize_market_names)
+            ]
+        ]
 
         if not get_user_confirmation("Begin liquidation?"):
             continue
 
         # liquidate
-        liq_group = repay_market.get_liquidate_txns(liquidator_user.lending, liquidatee_user, repay_amount, seize_market)
+        liq_group = repay_market.get_liquidate_txns(
+            liquidator_user.lending, liquidatee_user, repay_amount, seize_market
+        )
         liq_group.sign_with_private_key(liquidator_key)
         try:
             liq_txid = algod_client.send_transactions(liq_group.signed_transactions)
             wait_for_confirmation(algod_client, liq_txid)
         except:
-            print("Failed to liquidate " + target_address + " by repaying " + repay_market.name + " and seizing " + seize_market.name)
+            print(
+                "Failed to liquidate "
+                + target_address
+                + " by repaying "
+                + repay_market.name
+                + " and seizing "
+                + seize_market.name
+            )
             continue
 
         # burn
         user = algofi_client.get_user(liquidator_address)
         user_b_asset_balance = liquidator_user.balances(seize_market.b_asset_id)
         if user_b_asset_balance > 0:
-            burn_group = seize_market.get_burn_txns(liquidator_user.lending, user_b_asset_balance)
+            burn_group = seize_market.get_burn_txns(
+                liquidator_user.lending, user_b_asset_balance
+            )
             burn_group.sign_with_private_key(liquidator_key)
             try:
-                burn_txid = algod_client.send_transactions(burn_group.signed_transactions)
+                burn_txid = algod_client.send_transactions(
+                    burn_group.signed_transactions
+                )
                 wait_for_confirmation(algod_client, burn_txid)
             except:
-                print("Failed to burn " + seize_market.name + " bAsset collateral from liquidation of " + target_address)
+                print(
+                    "Failed to burn "
+                    + seize_market.name
+                    + " bAsset collateral from liquidation of "
+                    + target_address
+                )
