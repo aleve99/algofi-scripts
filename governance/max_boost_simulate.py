@@ -1,4 +1,3 @@
-
 import argparse
 
 from algofipy.algofi_client import AlgofiClient
@@ -8,21 +7,19 @@ from algofipy.globals import Network
 
 # usdc, usdt staking contracts
 STAKING_CONTRACTS = {
-    "USDC": {
-        "staking": 821882730,
-        "market": 818182048
-    },
-    "USDT": {
-        "staking": 821882927,
-        "market": 818190205
-    }
+    "USDC": {"staking": 821882730, "market": 818182048},
+    "USDT": {"staking": 821882927, "market": 818190205},
 }
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Input processor")
-    parser.add_argument("--algod_uri", type=str, default="https://node.algoexplorerapi.io")
+    parser.add_argument(
+        "--algod_uri", type=str, default="https://node.algoexplorerapi.io"
+    )
     parser.add_argument("--algod_token", type=str, default="")
-    parser.add_argument("--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io")
+    parser.add_argument(
+        "--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io"
+    )
     parser.add_argument("--indexer_token", type=str, default="")
     parser.add_argument("--bank_amount", type=str, required=True)
     parser.add_argument("--amts_staked", type=str, required=True)
@@ -44,8 +41,10 @@ if __name__ == "__main__":
         staking_contract_state = client.staking.staking_contracts[staking_app_id]
         market_contract_state = client.lending.markets[market_app_id]
 
-        global_total_staked = staking_contract_state.total_staked 
-        bank_to_underlying_exchange = market_contract_state.b_asset_to_asset_amount(1e9).underlying / 1e9
+        global_total_staked = staking_contract_state.total_staked
+        bank_to_underlying_exchange = (
+            market_contract_state.b_asset_to_asset_amount(1e9).underlying / 1e9
+        )
         for user_amount_staked in user_amounts_staked:
             user_staked_amount = user_amount_staked / bank_to_underlying_exchange * 1e6
             print("Staking " + str(user_amount_staked) + " " + staking_contract)
@@ -53,6 +52,19 @@ if __name__ == "__main__":
                 # projected based on inputs
                 user_vebank = baseline_bank_amount * lock_time_in_months / 12 * 1e6
                 boost_multiplier = user_vebank / total_vebank
-                user_scaled_amount = min(0.4 * user_staked_amount + 0.6 * boost_multiplier * (global_total_staked+user_staked_amount), user_staked_amount)
+                user_scaled_amount = min(
+                    0.4 * user_staked_amount
+                    + 0.6
+                    * boost_multiplier
+                    * (global_total_staked + user_staked_amount),
+                    user_staked_amount,
+                )
                 boost = user_scaled_amount / (0.4 * user_staked_amount)
-                print("Lock " + str(baseline_bank_amount) + " for " + str(lock_time_in_months) + " months: " + str(round(boost, 2)))
+                print(
+                    "Lock "
+                    + str(baseline_bank_amount)
+                    + " for "
+                    + str(lock_time_in_months)
+                    + " months: "
+                    + str(round(boost, 2))
+                )
