@@ -48,7 +48,7 @@ if __name__ == "__main__":
         "--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io"
     )
     parser.add_argument("--indexer_token", type=str, default="")
-    parser.add_argument("--csv_fpath", type=str, required=True)
+    parser.add_argument("--csv_fpath", type=str)
     parser.add_argument("--html_fpath", type=str)
     args = parser.parse_args()
 
@@ -128,9 +128,11 @@ if __name__ == "__main__":
     governor_df = governor_df[
         ["primary_address", "amount_vebank", "delegator_count", "percentage"]
     ]
-    governor_df.to_csv(
-        args.csv_fpath + "governor-report-%s.csv" % timestamp, index=False
-    )
+
+    if args.csv_fpath:
+        governor_df.to_csv(
+            args.csv_fpath + "governor-report-%s.csv" % timestamp, index=False
+        )
 
     if args.html_fpath:
         with open(args.html_fpath + "governors.html", "w") as f:
