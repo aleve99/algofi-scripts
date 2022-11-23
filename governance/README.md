@@ -12,7 +12,7 @@ python3 vebank_update.py --algod_uri [algod node uri] --algod_token [algod node 
 
 ### Generating report of top governors
 ```bash
-python3 delegate_report.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --csv_fpath [csv fpath]
+python3 governor_report.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --csv_fpath [csv fpath]
 ```
 
 ### Closing out vote accounts
