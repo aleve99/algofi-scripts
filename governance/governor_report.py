@@ -136,4 +136,4 @@ if __name__ == "__main__":
 
     if args.html_fpath:
         with open(args.html_fpath + "governors.html", "w") as f:
-            f.write(governor_df.to_html())
+            f.write(governor_df.to_html(index=False))
