@@ -103,7 +103,7 @@ if __name__ == "__main__":
                 governor_data[user_address] = {
                     "amount_vebank": amount_vebank,
                     "delegator_count": 1 if delegating_to else 0,
-                    "primary_address": primary_address
+                    "primary_address": primary_address,
                 }
 
     governor_df = pd.DataFrame(governor_data).transpose()
@@ -118,8 +118,12 @@ if __name__ == "__main__":
     )
     governor_df = governor_df.sort_values(by=["amount_vebank"], ascending=False)
     # order columns
-    governor_df = governor_df[["primary_address", "amount_vebank", "delegator_count", "percentage"]]
-    governor_df.to_csv(args.csv_fpath + "governor-report-%s.csv" % timestamp, index=False)
+    governor_df = governor_df[
+        ["primary_address", "amount_vebank", "delegator_count", "percentage"]
+    ]
+    governor_df.to_csv(
+        args.csv_fpath + "governor-report-%s.csv" % timestamp, index=False
+    )
 
     if args.html_fpath:
         with open(args.html_fpath + "governors.html", "w") as f:
