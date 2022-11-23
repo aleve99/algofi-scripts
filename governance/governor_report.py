@@ -116,6 +116,13 @@ if __name__ == "__main__":
             list(governor_df["amount_vebank"]),
         )
     )
+    # format vebank
+    governor_df["amount_vebank"] = list(
+        map(
+            lambda x: int(round(x / 1e6, 0)),
+            list(governor_df["amount_vebank"]),
+        )
+    )
     governor_df = governor_df.sort_values(by=["amount_vebank"], ascending=False)
     # order columns
     governor_df = governor_df[
