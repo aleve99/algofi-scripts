@@ -10,7 +10,7 @@ python3 delegated_voting.py --algod_uri [algod node uri] --algod_token [algod no
 python3 vebank_update.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --pct_threshold [percent veBANK delta threshold] --env_fpath [fpath to env vars]
 ```
 
-### Generating report of top delegates
+### Generating report of top governors
 ```bash
 python3 delegate_report.py --algod_uri [algod node uri] --algod_token [algod node token] --indexer_uri [indexer node uri] --indexer_token [indexer node token] --csv_fpath [csv fpath]
 ```

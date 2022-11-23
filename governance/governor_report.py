@@ -59,7 +59,6 @@ if __name__ == "__main__":
     timestamp = get_time()
 
     # query governance users
-    print("Querying governance users...")
     (
         governor_admin_state,
         storage_mapping,
@@ -82,54 +81,46 @@ if __name__ == "__main__":
             }
 
     # iterate over governors, get delegating_to and generate data
-    delegate_data = {"Delegate": [], "Delegator": [], "DelegatedVotingPower [k]": []}
+    governor_data = {}
     for governor_address in governor_state:
-        delegating_to = governor_state[governor_address]["admin"]["delegating_to"]
-        if delegating_to:
-            amount_vebank = client.governance.voting_escrow.get_projected_vebank_amount(
-                UserVotingEscrowState(governor_state[governor_address]["voting_escrow"])
-            )
-            if amount_vebank > 0:
-                delegate_data["Delegate"].append(delegating_to)
-                delegate_data["Delegator"].append(governor_address)
-                delegate_data["DelegatedVotingPower [k]"].append(
-                    round(amount_vebank / 1e9, 1)
-                )
-    delegate_df = pd.DataFrame(delegate_data)
-    delegate_df = delegate_df.sort_values(by=["Delegate"], ascending=False)
-
-    delegate_report = delegate_df.to_html()
-    total_vebank = client.governance.voting_escrow.total_vebank / 1e9
-    delegate_summary_df = delegate_df.groupby("Delegate").sum()
-    delegate_summary_df["VotingPower [k]"] = list(
-        map(
-            lambda delegate: round(
-                client.governance.voting_escrow.get_projected_vebank_amount(
-                    UserVotingEscrowState(
-                        governor_state[storage_mapping[delegate]]["voting_escrow"]
-                    )
-                )
-                / 1e9,
-                1,
-            ),
-            list(delegate_summary_df.index),
+        amount_vebank = client.governance.voting_escrow.get_projected_vebank_amount(
+            UserVotingEscrowState(governor_state[governor_address]["voting_escrow"])
         )
-    )
-    delegate_summary_df["Total [k]"] = (
-        delegate_summary_df["VotingPower [k]"]
-        + delegate_summary_df["DelegatedVotingPower [k]"]
-    )
-    delegate_summary_df["Percentage"] = list(
+        delegating_to = governor_state[governor_address]["admin"]["delegating_to"]
+        governor_storage_address = governor_state[governor_address]["admin"][
+            "storage_account"
+        ]
+        # add veBANK to governor if not delegating to o.w. to the governord user
+        user_address = delegating_to if delegating_to else governor_storage_address
+        if amount_vebank > 0:
+            if user_address in governor_data:
+                governor_data[user_address]["amount_vebank"] += amount_vebank
+                governor_data[user_address]["delegator_count"] += (
+                    1 if delegating_to else 0
+                )
+            else:
+                primary_address = storage_mapping[user_address]
+                governor_data[user_address] = {
+                    "amount_vebank": amount_vebank,
+                    "delegator_count": 1 if delegating_to else 0,
+                    "primary_address": primary_address
+                }
+
+    governor_df = pd.DataFrame(governor_data).transpose()
+
+    # get percentage of vebank
+    total_vebank = sum([data["amount_vebank"] for _, data in governor_data.items()])
+    governor_df["percentage"] = list(
         map(
             lambda x: round(x / total_vebank * 100, 1),
-            list(delegate_summary_df["Total [k]"]),
+            list(governor_df["amount_vebank"]),
         )
     )
-    delegate_summary_df = delegate_summary_df.sort_values(
-        by=["Percentage"], ascending=False
-    )
-    delegate_summary_df.to_csv(args.csv_fpath + "delegate-report-%s.csv" % timestamp)
+    governor_df = governor_df.sort_values(by=["amount_vebank"], ascending=False)
+    # order columns
+    governor_df = governor_df[["primary_address", "amount_vebank", "delegator_count", "percentage"]]
+    governor_df.to_csv(args.csv_fpath + "governor-report-%s.csv" % timestamp, index=False)
 
     if args.html_fpath:
-        with open(args.html_fpath + "delegates.html", "w") as f:
-            f.write(delegate_summary_df.to_html())
+        with open(args.html_fpath + "governors.html", "w") as f:
+            f.write(governor_df.to_html())
