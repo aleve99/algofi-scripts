@@ -1,4 +1,3 @@
-
 # generic imports
 import argparse
 import requests as re
@@ -44,10 +43,7 @@ if __name__ == "__main__":
     v1_client = AlgofiMainnetClient(algod_client, indexer_client)
     client = AlgofiClient(Network.MAINNET, algod_client, indexer_client)
 
-    treasury_data = {
-        "lending": {},
-        "dex": {}
-    }
+    treasury_data = {"lending": {}, "dex": {}}
 
     # borrow reserves from v1 lending protocol
     treasury_data["lending"]["v1"] = {"total": 0}
@@ -64,13 +60,21 @@ if __name__ == "__main__":
             fee = market.underlying_to_usd(market.underlying_reserves)
             treasury_data["lending"]["v2"][market.name] = fee
             treasury_data["lending"]["v2"]["total"] += fee
-    
+
     # lending total sum
-    treasury_data["lending"]["total"] = treasury_data["lending"]["v1"]["total"] + treasury_data["lending"]["v2"]["total"]
+    treasury_data["lending"]["total"] = (
+        treasury_data["lending"]["v1"]["total"]
+        + treasury_data["lending"]["v2"]["total"]
+    )
 
     # load prices
     # asset_id -> dollar price
-    prices = dict([(x["asset_id"], x["price"]) for x in re.get("https://api.algofi.org/assets").json()])
+    prices = dict(
+        [
+            (x["asset_id"], x["price"])
+            for x in re.get("https://api.algofi.org/assets").json()
+        ]
+    )
 
     # constant product pools
     """
@@ -88,8 +92,12 @@ if __name__ == "__main__":
     nanoswap_pools = client.amm.get_nanoswap_pools()
     treasury_data["dex"]["nanoswap"] = {"total": 0}
     for (pool_app_id, pool) in nanoswap_pools.items():
-        pool_name = pool.asset1.name + "_" + pool.asset2.name + "_" + pool.pool_type.name
-        fee = pool.asset1.to_usd(pool.asset1_reserve) + pool.asset2.to_usd(pool.asset2_reserve)
+        pool_name = (
+            pool.asset1.name + "_" + pool.asset2.name + "_" + pool.pool_type.name
+        )
+        fee = pool.asset1.to_usd(pool.asset1_reserve) + pool.asset2.to_usd(
+            pool.asset2_reserve
+        )
         treasury_data["dex"]["nanoswap"][pool_name] = fee
         treasury_data["dex"]["nanoswap"]["total"] += fee
 
@@ -97,8 +105,12 @@ if __name__ == "__main__":
     constant_product_lending_pools = client.amm.get_constant_product_lending_pools()
     treasury_data["dex"]["constant_product_lending_pool"] = {"total": 0}
     for (pool_app_id, pool) in constant_product_lending_pools.items():
-        pool_name = pool.asset1.name + "_" + pool.asset2.name + "_" + pool.pool_type.name
-        fee = pool.asset1.to_usd(pool.asset1_reserve) + pool.asset2.to_usd(pool.asset2_reserve)
+        pool_name = (
+            pool.asset1.name + "_" + pool.asset2.name + "_" + pool.pool_type.name
+        )
+        fee = pool.asset1.to_usd(pool.asset1_reserve) + pool.asset2.to_usd(
+            pool.asset2_reserve
+        )
         treasury_data["dex"]["constant_product_lending_pool"][pool_name] = fee
         treasury_data["dex"]["constant_product_lending_pool"]["total"] += fee
 
@@ -106,16 +118,26 @@ if __name__ == "__main__":
     nanoswap_lending_pools = client.amm.get_nanoswap_lending_pools()
     treasury_data["dex"]["nanoswap_lending_pool"] = {"total": 0}
     for (pool_app_id, pool) in nanoswap_lending_pools.items():
-        pool_name = pool.asset1.name + "_" + pool.asset2.name + "_" + pool.pool_type.name
-        fee = pool.asset1.to_usd(pool.asset1_reserve) + pool.asset2.to_usd(pool.asset2_reserve)
+        pool_name = (
+            pool.asset1.name + "_" + pool.asset2.name + "_" + pool.pool_type.name
+        )
+        fee = pool.asset1.to_usd(pool.asset1_reserve) + pool.asset2.to_usd(
+            pool.asset2_reserve
+        )
         treasury_data["dex"]["nanoswap_lending_pool"][pool_name] = fee
         treasury_data["dex"]["nanoswap_lending_pool"]["total"] += fee
-    
+
     # dex total sum
-    treasury_data["dex"]["total"] = treasury_data["dex"]["nanoswap"]["total"] + treasury_data["dex"]["constant_product_lending_pool"]["total"] + treasury_data["dex"]["nanoswap_lending_pool"]["total"]
-    
+    treasury_data["dex"]["total"] = (
+        treasury_data["dex"]["nanoswap"]["total"]
+        + treasury_data["dex"]["constant_product_lending_pool"]["total"]
+        + treasury_data["dex"]["nanoswap_lending_pool"]["total"]
+    )
+
     # algofi total sum
-    treasury_data["total"] = treasury_data["lending"]["total"] + treasury_data["dex"]["total"]
+    treasury_data["total"] = (
+        treasury_data["lending"]["total"] + treasury_data["dex"]["total"]
+    )
 
     print(treasury_data)
     print("Algofi Lending Total: ", treasury_data["lending"]["total"])
