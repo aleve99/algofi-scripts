@@ -2,7 +2,7 @@
 import pandas as pd
 import argparse
 from pytz import timezone
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # algorand imports
 from algosdk import account, encoding, mnemonic
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     # get transaction in each market
     txns_by_group = {}
     txns = []
-    for i in range(len(market_app_ids)):
+    for i, _ in enumerate(market_app_ids):
         market_app_id = market_app_ids[i]
         market_address = market_addresses[i]
         next_page = ""
@@ -109,9 +109,7 @@ if __name__ == "__main__":
                         liq_txn = txns_by_group[gid][liq_txn_id]
                         unix_time = liq_txn["round-time"]
                         round_ = liq_txn["confirmed-round"]
-                        timestamp = datetime.fromtimestamp(unix_time) - timedelta(
-                            hours=5
-                        )
+                        timestamp = datetime.fromtimestamp(unix_time)
                         app_args = liq_txn.get("application-transaction", {}).get(
                             "application-args", []
                         )
