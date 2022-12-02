@@ -131,9 +131,9 @@ if __name__ == "__main__":
                                             borrow_price = (
                                                 markets[borrow_app_id].oracle.raw_price / 1000000
                                             )
+                                            break
                                         except Exception:
                                             sleep(1)
-                                            break
                                 elif app_args[0] == "c2M=":
                                     accounts = liq_txn.get(
                                         "application-transaction", {}

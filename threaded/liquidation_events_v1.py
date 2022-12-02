@@ -145,9 +145,9 @@ if __name__ == "__main__":
                                                     collateral_seized_amount *= (
                                                         bank_to_exchange_rate / 1e9
                                                     )
+                                                    break
                                                 except Exception:
                                                     sleep(1)
-                                                    break
                                         else:
                                             collateral_seized_amount = inner_txn[
                                                 "inner-txns"
@@ -168,9 +168,9 @@ if __name__ == "__main__":
                                                 borrow_price = algofi_client.markets[
                                                     borrow_market
                                                 ].asset.get_price(block=round_)
+                                                break
                                             except Exception:
                                                 sleep(1)
-                                                break                            
                             else:
                                 asset_transfer_txn = liq_txn.get(
                                     "asset-transfer-transaction", {}
