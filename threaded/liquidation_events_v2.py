@@ -126,9 +126,14 @@ if __name__ == "__main__":
                                         "application-id"
                                     ]
                                     borrow_market = market_id_to_name[borrow_app_id]
-                                    borrow_price = (
-                                        markets[borrow_app_id].oracle.raw_price / 1000000
-                                    )
+                                    while True:
+                                        try:
+                                            borrow_price = (
+                                                markets[borrow_app_id].oracle.raw_price / 1000000
+                                            )
+                                        except Exception:
+                                            sleep(1)
+                                            break
                                 elif app_args[0] == "c2M=":
                                     accounts = liq_txn.get(
                                         "application-transaction", {}
@@ -166,8 +171,6 @@ if __name__ == "__main__":
                                         .decimals
                                     )
                                     collateral_seized_amount /= 10 ** (decimals)
-                                else:
-                                    print(app_args[0])
                             else:
                                 asset_transfer_txn = liq_txn.get(
                                     "asset-transfer-transaction", {}

@@ -137,12 +137,17 @@ if __name__ == "__main__":
                                             collateral_seized_amount = asset_transfer_txn[
                                                 "amount"
                                             ]
-                                            bank_to_exchange_rate = algofi_client.markets[
-                                                collateral_market
-                                            ].get_bank_to_underlying_exchange(block=round_)
-                                            collateral_seized_amount *= (
-                                                bank_to_exchange_rate / 1e9
-                                            )
+                                            while True:
+                                                try:
+                                                    bank_to_exchange_rate = algofi_client.markets[
+                                                        collateral_market
+                                                    ].get_bank_to_underlying_exchange(block=round_)
+                                                    collateral_seized_amount *= (
+                                                        bank_to_exchange_rate / 1e9
+                                                    )
+                                                except Exception:
+                                                    sleep(1)
+                                                    break
                                         else:
                                             collateral_seized_amount = inner_txn[
                                                 "inner-txns"
@@ -158,9 +163,14 @@ if __name__ == "__main__":
                                                 "application-id"
                                             ]
                                         ]
-                                        borrow_price = algofi_client.markets[
-                                            borrow_market
-                                        ].asset.get_price(block=round_)
+                                        while True:
+                                            try:
+                                                borrow_price = algofi_client.markets[
+                                                    borrow_market
+                                                ].asset.get_price(block=round_)
+                                            except Exception:
+                                                sleep(1)
+                                                break                            
                             else:
                                 asset_transfer_txn = liq_txn.get(
                                     "asset-transfer-transaction", {}
