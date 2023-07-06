@@ -9,11 +9,9 @@ def get_time(tz="EST"):
 
 ENDPOINTS = {"Node": [
         {"url": "https://mainnet-api.algonode.cloud", "key": ""},
-        {"url": "https://node.algoexplorerapi.io", "key": ""}
     ],
     "Indexer": [
         {"url": "https://mainnet-idx.algonode.cloud", "key": ""},
-        {"url": "https://algoindexer.algoexplorerapi.io", "key": ""}
     ]}
 
 
