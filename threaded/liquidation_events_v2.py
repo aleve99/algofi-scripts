@@ -26,11 +26,11 @@ from tqdm import tqdm
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Input processor")
     parser.add_argument(
-        "--algod_uri", type=str, default="https://node.algoexplorerapi.io"
+        "--algod_uri", type=str, default="https://mainnet-api.algonode.cloud"
     )
     parser.add_argument("--algod_token", type=str, default="")
     parser.add_argument(
-        "--indexer_uri", type=str, default="https://algoindexer.algoexplorerapi.io"
+        "--indexer_uri", type=str, default="https://mainnet-idx.algonode.cloud"
     )
     parser.add_argument("--indexer_token", type=str, default="")
     parser.add_argument("--block_delta", type=int, default=20000)
